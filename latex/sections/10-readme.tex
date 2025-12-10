@@ -1,0 +1,345 @@
+% 10-readme.tex
+% README 内容セクション
+
+\chapter{README 内容と応用}
+
+\section{README.md の役割}
+
+README.md はプロジェクトの入口となるドキュメントです。
+本セクションでは、効果的な README 構成と実装方法を解説します。
+
+\section{README 最適構成}
+
+\begin{lstlisting}[language=markdown,caption=README.md の最適構成テンプレート]
+# プロジェクト名
+
+[![Badge1](url)](link)
+[![Badge2](url)](link)
+
+## 🎯 概要
+
+1 段落で何ができるかを説明（最大 100 語）
+
+### 主な特徴
+
+- ✓ 特徴 1
+- ✓ 特徴 2
+- ✓ 特徴 3
+
+## 📋 目次
+
+- [インストール](#インストール)
+- [使い方](#使い方)
+- [アーキテクチャ](#アーキテクチャ)
+- [貢献](#貢献)
+
+## 🚀 クイックスタート
+
+\`\`\`bash
+# 最小限のセットアップコマンド
+git clone https://github.com/...
+cd project
+bash setup.sh
+\`\`\`
+
+## 📦 インストール
+
+### 前提条件
+- Git 2.20+
+- Docker 20.10+
+
+### インストール手順
+
+1. リポジトリクローン
+2. 環境変数設定
+3. 依存関係インストール
+
+### シークレット設定
+
+| Key | Value |
+|-----|-------|
+| GITHUB_TOKEN | auto |
+| PAT_TOKEN | your-pat |
+
+## 💻 使い方
+
+### 基本使用例
+
+\`\`\`bash
+# ビルド
+docker build -t myapp:latest .
+
+# 実行
+docker run myapp:latest
+\`\`\`
+
+### 詳細な使用例
+
+[詳細ドキュメント](docs/USAGE.md) を参照
+
+## 🏗️ アーキテクチャ
+
+[図を表示]
+
+## 🔒 セキュリティ
+
+[セキュリティ ポリシー](SECURITY.md)
+
+## 📚 ドキュメント
+
+- [ビルド手順](docs/BUILD.md)
+- [デプロイ手順](docs/DEPLOY.md)
+- [トラブルシューティング](docs/TROUBLESHOOTING.md)
+
+## 🤝 貢献
+
+プルリクエスト歓迎！
+[貢献ガイドライン](CONTRIBUTING.md)
+
+## 📄 ライセンス
+
+[MIT License](LICENSE)
+
+## 👥 お問い合わせ
+
+- 📧 Email: info@example.com
+- 🐦 Twitter: @handle
+- 💬 Discussions: GitHub Discussions
+\end{lstlisting}
+
+\section{バッジの追加方法}
+
+\subsection{一般的なバッジ}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{バッジ} & \textbf{Markdown} \\
+\hline
+Build Status & \verb|[![Build](url/badge.svg)](url)| \\
+License & \verb|[![MIT](url/badge.svg)](LICENSE)| \\
+Python Version & \verb|[![Python 3.11](url/badge.svg)](url)| \\
+Docker & \verb|[![Docker](url/badge.svg)](url)| \\
+\hline
+\end{tabularx}
+\caption{一般的なバッジ}
+\end{table}
+
+\subsection{バッジ生成ツール}
+
+\begin{itemize}
+  \item \textbf{Shields.io}: \url{https://shields.io}
+  \item \textbf{GitHub Actions Status}: 自動生成
+  \item \textbf{Codecov}: カバレッジバッジ
+  \item \textbf{Docker Hub}: イメージメタデータ
+\end{itemize}
+
+\section{表の効果的な使用}
+
+\begin{lstlisting}[language=markdown,caption=README 内の表の例]
+## 機能比較表
+
+| 機能 | 無料版 | Pro版 | Enterprise |
+|------|--------|-------|-----------|
+| 基本機能 | ✓ | ✓ | ✓ |
+| CI/CD | - | ✓ | ✓ |
+| カスタムドメイン | - | ✓ | ✓ |
+| SLA保証 | - | - | ✓ |
+
+## 環境別ワークフロー表
+
+| 環境 | 用途 | トリガー | 出力 |
+|------|------|---------|------|
+| dev | 開発テスト | Push to develop | ログ出力 |
+| staging | 本番前テスト | PR to main | Test report |
+| production | 本番運用 | Release tag | Deployment |
+\end{lstlisting}
+
+\section{コード例の効果的な提示}
+
+\subsection{言語指定}
+
+\begin{lstlisting}[language=markdown,caption=複数言語の code block]
+# Python 例
+\`\`\`python
+import os
+print(os.getenv('MY_VAR'))
+\`\`\`
+
+# bash 例
+\`\`\`bash
+export MY_VAR=value
+\`\`\`
+
+# Docker コマンド例
+\`\`\`docker
+FROM python:3.11-slim
+RUN pip install requests
+\`\`\`
+\end{lstlisting}
+
+\section{セクション別 README テンプレート}
+
+\subsection{新規プロジェクト用テンプレート}
+
+\begin{lstlisting}[language=markdown,caption=新規プロジェクト README]
+# My Awesome Project
+
+## 概要
+このプロジェクトは [説明] を目指しています。
+
+## インストール
+
+\`\`\`bash
+git clone ...
+cd ...
+pip install -r requirements.txt
+\`\`\`
+
+## 使い方
+
+\`\`\`bash
+python main.py --help
+\`\`\`
+
+## ライセンス
+MIT
+
+## 貢献
+Pull Request 歓迎！
+\end{lstlisting}
+
+\subsection{既存プロジェクト更新用テンプレート}
+
+\begin{lstlisting}[language=markdown,caption=更新内容を記載した README]
+## 変更履歴
+
+### v2.0.0 (2025-12-10)
+- ✨ 新機能 A を追加
+- 🐛 バグ B を修正
+- ⚡ パフォーマンス C を改善
+
+### v1.5.0 (2025-11-10)
+- ...
+
+## マイグレーション ガイド
+
+v1.x から v2.0 への更新方法：
+
+1. 依存関係を更新: \`pip install --upgrade package\`
+2. 設定ファイルを移行: [マイグレーション手順](docs/MIGRATE.md)
+3. テストを再実行
+\end{lstlisting}
+
+\section{よくある質問 (FAQ) セクション}
+
+\begin{lstlisting}[language=markdown,caption=README に FAQ を追加]
+## よくある質問
+
+### Q: インストールに失敗した
+A: [トラブルシューティング](docs/TROUBLESHOOTING.md) を確認してください。
+
+### Q: Docker イメージはどこにある？
+A: [GHCR Registry](https://ghcr.io/your-org/project) で公開しています。
+
+### Q: ライセンスは？
+A: [MIT License](LICENSE) です。商用利用可能です。
+
+### Q: 日本語ドキュメントはありますか？
+A: [日本語ドキュメント](docs/README_ja.md) を参照してください。
+\end{lstlisting}
+
+\section{README チェックリスト}
+
+プロジェクト公開前に確認：
+
+\begin{itemize}
+  \item \checkbox{} 明確なプロジェクト説明
+  \item \checkbox{} インストール手順
+  \item \checkbox{} 使用例（コード付き）
+  \item \checkbox{} ライセンス明記
+  \item \checkbox{} 貢献ガイドリンク
+  \item \checkbox{} トラブルシューティング
+  \item \checkbox{} FAQ
+  \item \checkbox{} バッジ付き
+  \item \checkbox{} リンク確認（全て有効）
+  \item \checkbox{} スペリングチェック（特に日本語）
+  \item \checkbox{} コード例が実行可能か確認
+  \item \checkbox{} ディレクトリ構造が最新か確認
+  \item \checkbox{} 前提条件の明記
+  \item \checkbox{} 必要なシークレット情報の記載
+  \item \checkbox{} サポート窓口情報の記載
+\end{itemize}
+
+\section{README メンテナンス}
+
+\subsection{定期更新スケジュール}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|l|}
+\hline
+\textbf{頻度} & \textbf{更新内容} \\
+\hline
+毎月 & バージョン情報、リリースノート \\
+四半期 & バッジ更新、依存関係の最小バージョン \\
+必要に応じて & バグ修正、新機能追加、FAQ 追加 \\
+\hline
+\end{tabularx}
+\caption{README メンテナンススケジュール}
+\end{table}
+
+\subsection{バージョン管理}
+
+\begin{lstlisting}[language=bash,caption=README バージョン管理]
+# README 内にバージョン情報を含める
+---
+version: 2.0.0
+last-updated: 2025-12-10
+maintained: true
+---
+
+# README をコミット時に日付付けで記録
+git log --oneline -- README.md | head -10
+\end{lstlisting}
+
+\section{多言語対応 README}
+
+\begin{lstlisting}[language=markdown,caption=多言語 README サポート]
+# プロジェクト名
+
+[日本語](README_ja.md) | [English](README.md) | [中文](README_zh.md)
+
+## English Version
+
+# Project Name
+
+[Content in English]
+
+---
+
+## 日本語版
+
+[日本語コンテンツ]
+\end{lstlisting}
+
+\note{GitHub は複数言語の README.md を自動検出します。
+言語別ファイル名: README\_en.md, README\_ja.md, etc.}
+
+\section{README 自動生成ツール}
+
+\begin{itemize}
+  \item \textbf{readme-md-generator}: npm パッケージ
+  \item \textbf{auto-readme}: Python ツール
+  \item \textbf{GitHub CLI}: \cmd{gh api} で自動化
+\end{itemize}
+
+例：
+
+\begin{lstlisting}[language=bash,caption=readme-md-generator 使用例]
+npm install -g readme-md-generator
+
+# 対話的に README 生成
+readme
+\end{lstlisting}

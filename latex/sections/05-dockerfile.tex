@@ -1,0 +1,378 @@
+% 05-dockerfile.tex
+% Dockerfile セクション
+
+\chapter{Dockerfile と OCR 環境}
+
+\section{概要}
+
+このセクションでは、Python + Tesseract OCR を備えた本番環境対応の Dockerfile を実装します。
+
+\section{Dockerfile 実装}
+
+\begin{lstlisting}[language=dockerfile,caption=本番対応 Dockerfile]
+# Dockerfile
+# Copilot 完全自動化ガイド - OCR 環境
+# マルチステージビルド対応
+# 作成日: 2025-12-10
+
+# ========================================
+# ステージ 1: ビルドステージ
+# ========================================
+FROM python:3.11-slim as builder
+
+LABEL maintainer="Copilot Automation <info@example.com>"
+LABEL description="OCR Processing Environment for Copilot Automation"
+LABEL version="1.0.0"
+
+# 作業ディレクトリ設定
+WORKDIR /build
+
+# ビルド依存関係インストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    g++ \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python 依存関係ダウンロード
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip download --no-cache-dir \
+    --dest /pip-packages \
+    -r requirements.txt
+
+# ========================================
+# ステージ 2: ランタイムステージ
+# ========================================
+FROM python:3.11-slim
+
+# メタデータ
+ARG BUILD_DATE
+ARG VCS_REF
+LABEL org.label-schema.build-date=$BUILD_DATE
+LABEL org.label-schema.vcs-ref=$VCS_REF
+
+# 非ルートユーザー作成
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# 作業ディレクトリ
+WORKDIR /app
+
+# システムパッケージをインストール（OCR）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-jpn \
+    tesseract-ocr-eng \
+    libtesseract-dev \
+    leptonica-progs \
+    libmagic1 \
+    fonts-noto-cjk \
+    && rm -rf /var/lib/apt/lists/*
+
+# キャッシュマウント経由で効率的にインストール
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir \
+    pytesseract==0.3.10 \
+    pillow==10.0.0 \
+    opencv-python==4.8.0.76 \
+    numpy==1.24.3 \
+    pandas==2.0.3 \
+    pydantic==2.0.0
+
+# 依存ファイル コピー（本番）
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir -r requirements.txt || true
+
+# アプリケーション コピー
+COPY --chown=appuser:appuser . .
+
+# ディレクトリパーミッション設定
+RUN mkdir -p /app/input /app/output && \
+    chown -R appuser:appuser /app && \
+    chmod 755 /app/input /app/output
+
+# 非ルートユーザーに切り替え
+USER appuser
+
+# ヘルスチェック
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import pytesseract; pytesseract.get_tesseract_version()" || exit 1
+
+# デフォルトコマンド
+ENTRYPOINT ["python"]
+CMD ["main.py"]
+
+# ========================================
+# ステージ 3: テストステージ（オプション）
+# ========================================
+FROM python:3.11-slim as test
+
+WORKDIR /app
+
+# テストツール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    pytest \
+    pytest-cov \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /pip-packages /pip-packages
+RUN pip install /pip-packages/* && \
+    pip install pytest pytest-cov
+
+COPY . .
+
+# テスト実行
+CMD ["pytest", "-v", "--cov=.", "tests/"]
+\end{lstlisting}
+
+\section{requirements.txt}
+
+\begin{lstlisting}[caption=requirements.txt - Python 依存関係]
+# requirements.txt
+# Python OCR 環境 依存関係
+# Python 3.9+
+
+# === OCR & 画像処理 ===
+pytesseract==0.3.10          # Tesseract Python インターフェース
+pillow==10.0.0               # 画像処理ライブラリ
+opencv-python==4.8.0.76      # コンピュータビジョン
+numpy==1.24.3                # 数値計算
+
+# === データ処理 ===
+pandas==2.0.3                # データ分析
+openpyxl==3.1.2             # Excel 処理
+pydantic==2.0.0              # データバリデーション
+
+# === ファイルハンドリング ===
+python-magic-bin==0.4.14    # ファイル型認識
+
+# === ロギング & モニタリング ===
+python-json-logger==2.0.7   # JSON ロギング
+prometheus-client==0.17.1   # Prometheus メトリクス
+
+# === Web & API ===
+requests==2.31.0            # HTTP ライブラリ
+httpx==0.24.1               # 非同期 HTTP
+
+# === 設定管理 ===
+python-dotenv==1.0.0        # .env ファイル読み込み
+
+# === デバッグ & 開発 ===
+pytest==7.4.0               # テストフレームワーク（開発用）
+pytest-cov==4.1.0           # カバレッジ測定
+black==23.7.0               # コードフォーマッター
+flake8==6.0.0               # リンター
+
+# === セキュリティ ===
+cryptography==41.0.3        # 暗号化
+\end{lstlisting}
+
+\section{Docker 実行方法}
+
+\subsection{ローカルビルド}
+
+\begin{lstlisting}[language=bash,caption=Docker イメージビルド]
+# イメージビルド
+docker build -t copilot-automation:latest .
+
+# タグ付け（GHCR 用）
+docker tag copilot-automation:latest \
+  ghcr.io/your-org/copilot-automation:latest
+\end{lstlisting}
+
+\subsection{コンテナ実行（OCR 処理例）}
+
+\begin{lstlisting}[language=bash,caption=Docker コンテナ実行]
+# 入出力ボリュームマウント
+docker run --rm \
+  --name copilot-ocr \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  copilot-automation:latest \
+  main.py
+
+# 環境変数指定
+docker run --rm \
+  -e LOG_LEVEL=DEBUG \
+  -e OCR_LANGUAGE=jpn+eng \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  copilot-automation:latest
+\end{lstlisting}
+
+\subsection{Docker Compose（開発環境）}
+
+\begin{lstlisting}[language=yaml,caption=docker-compose.yml]
+version: '3.8'
+
+services:
+  ocr-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: copilot-ocr
+    environment:
+      - LOG_LEVEL=INFO
+      - OCR_LANGUAGE=jpn+eng
+      - TZ=Asia/Tokyo
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+      - ./logs:/app/logs
+    networks:
+      - copilot-net
+    restart: on-failure
+
+  # オプション: nginx リバースプロキシ
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./output:/usr/share/nginx/html:ro
+    depends_on:
+      - ocr-processor
+    networks:
+      - copilot-net
+
+networks:
+  copilot-net:
+    driver: bridge
+\end{lstlisting}
+
+\section{main.py - OCR スクリプト例}
+
+\begin{lstlisting}[language=python,caption=main.py - OCR メイン処理]
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+main.py - OCR 処理メインスクリプト
+Tesseract OCR を使用してPDF/画像からテキストを抽出し CSV に出力
+"""
+
+import os
+import sys
+import logging
+from pathlib import Path
+import pytesseract
+from PIL import Image
+import pandas as pd
+
+# ロギング設定
+logging.basicConfig(
+    level=os.getenv('LOG_LEVEL', 'INFO'),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# 入出力パス
+INPUT_DIR = Path('/app/input')
+OUTPUT_DIR = Path('/app/output')
+
+def extract_text_from_image(image_path: Path) -> str:
+    """
+    画像ファイルから OCR でテキスト抽出
+    
+    Args:
+        image_path: 画像ファイルパス
+    
+    Returns:
+        抽出されたテキスト
+    """
+    try:
+        image = Image.open(image_path)
+        # 日本語 + 英語で OCR
+        text = pytesseract.image_to_string(
+            image,
+            lang='jpn+eng'
+        )
+        logger.info(f"✓ {image_path.name} から OCR 抽出完了")
+        return text
+    except Exception as e:
+        logger.error(f"✗ OCR 抽出失敗 {image_path}: {e}")
+        return ""
+
+def process_input_directory():
+    """入力ディレクトリ内の全ファイルを処理"""
+    results = []
+    
+    # サポート形式
+    image_extensions = {'.jpg', '.jpeg', '.png', '.tif', '.tiff'}
+    
+    for file_path in INPUT_DIR.glob('*'):
+        if file_path.suffix.lower() not in image_extensions:
+            logger.warning(f"スキップ: {file_path.name} (非対応形式)")
+            continue
+        
+        logger.info(f"処理中: {file_path.name}")
+        text = extract_text_from_image(file_path)
+        
+        results.append({
+            'filename': file_path.name,
+            'extracted_text': text,
+            'text_length': len(text)
+        })
+    
+    return results
+
+def save_results_to_csv(results: list):
+    """
+    結果を CSV に保存
+    
+    Args:
+        results: OCR 結果リスト
+    """
+    if not results:
+        logger.warning("処理対象ファイルがありません")
+        return
+    
+    df = pd.DataFrame(results)
+    output_file = OUTPUT_DIR / 'ocr_results.csv'
+    
+    try:
+        df.to_csv(output_file, index=False, encoding='utf-8-sig')
+        logger.info(f"✓ CSV 保存成功: {output_file}")
+        logger.info(f"  処理ファイル数: {len(results)}")
+    except Exception as e:
+        logger.error(f"✗ CSV 保存失敗: {e}")
+
+def main():
+    """メイン処理"""
+    logger.info("=" * 50)
+    logger.info("OCR 処理スクリプト開始")
+    logger.info("=" * 50)
+    
+    # ディレクトリ確認
+    if not INPUT_DIR.exists():
+        logger.error(f"入力ディレクトリが見つかりません: {INPUT_DIR}")
+        return 1
+    
+    OUTPUT_DIR.mkdir(exist_ok=True)
+    
+    # 処理実行
+    results = process_input_directory()
+    save_results_to_csv(results)
+    
+    logger.info("=" * 50)
+    logger.info("OCR 処理完了")
+    logger.info("=" * 50)
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())
+\end{lstlisting}
+
+\section{セキュリティベストプラクティス}
+
+\begin{itemize}
+  \item \textbf{マルチステージビルド}: 本番イメージサイズ最小化
+  \item \textbf{非ルートユーザー}: \cmd{USER appuser} で権限制限
+  \item \textbf{ヘルスチェック}: コンテナ健全性自動監視
+  \item \textbf{キャッシュマウント}: ビルド高速化
+  \item \textbf{.dockerignore}: センシティブファイル除外
+\end{itemize}
+
+\tip{イメージサイズは約 1.2GB（Tesseract + 日本語フォント込み）です。
+本番環境では Amazon ECR や Docker Hub キャッシュを活用してください。}

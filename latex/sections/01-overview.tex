@@ -1,0 +1,153 @@
+% 01-overview.tex
+% 概要セクション
+
+\chapter{概要}
+
+\section{このプロジェクトについて}
+
+Copilot 完全自動化ガイドは、最新の DevOps ツールとクラウドサービスを組み合わせた
+\textbf{エンドツーエンド自動化ソリューション}です。
+
+\subsection{主な目標}
+
+\begin{enumerate}
+  \item LaTeX ドキュメントから PDF を自動生成
+  \item スターターキットを ZIP にパッケージング
+  \item GitHub Actions による CI/CD パイプライン構築
+  \item Docker コンテナで OCR 処理を実行
+  \item Power Automate で業務フロー自動化
+  \item セキュリティベストプラクティス実装
+\end{enumerate}
+
+\section{アーキテクチャ概要}
+
+\subsection{システム構成}
+
+\begin{figure}[h]
+\centering
+\begin{verbatim}
+┌─────────────────────────────────────────────┐
+│   GitHub Repository (Trigger)               │
+│   - Push, Pull Request, Release Tag         │
+└────────────┬────────────────────────────────┘
+             │
+             ▼
+┌─────────────────────────────────────────────┐
+│   GitHub Actions Workflow                   │
+│   - LaTeX Build (pdflatex x2)              │
+│   - Docker Build & Push (GHCR)             │
+│   - Starter Kit ZIP Generation             │
+│   - Release Upload                         │
+│   - Power Automate Trigger                 │
+└────┬────────────────────────────┬───────────┘
+     │                            │
+     ▼                            ▼
+┌──────────────────┐    ┌──────────────────┐
+│  GitHub Release  │    │  GHCR Registry   │
+│  (PDF + ZIP)     │    │  (Docker Image)  │
+└──────────────────┘    └──────────────────┘
+     │
+     ▼
+┌──────────────────────────────────────────────┐
+│   Power Automate Flow                        │
+│   - Download Release ZIP                     │
+│   - OCR Processing (Docker)                  │
+│   - CSV Generation                           │
+│   - OneDrive Upload                          │
+└──────────────────────────────────────────────┘
+\end{verbatim}
+\caption{システム全体構成図}
+\end{figure}
+
+\section{必要な事前知識}
+
+このガイドを最大限に活用するには、以下の知識があると便利です：
+
+\begin{itemize}
+  \item \textbf{Git/GitHub}: リポジトリ管理、ワークフロー理解
+  \item \textbf{YAML}: GitHub Actions の構文理解
+  \item \textbf{Docker}: コンテナ基本、Dockerfile 記述
+  \item \textbf{Python}: OCR スクリプト理解
+  \item \textbf{LaTeX}: ドキュメント作成（初心者OK）
+  \item \textbf{Power Automate}: クラウドフロー設計
+  \item \textbf{bash/PowerShell}: シェルスクリプト実行
+\end{itemize}
+
+\section{対応環境}
+
+\subsection{開発環境}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{環境} & \textbf{推奨バージョン} \\
+\hline
+Git & 2.20+ \\
+Docker & 20.10+ \\
+Python & 3.9+ \\
+Node.js & 14+ (オプション) \\
+LaTeX (TeX Live) & 2020 以上 \\
+bash & 4.0+ \\
+PowerShell & 5.1+ (Windows) \\
+\hline
+\end{tabularx}
+\caption{推奨環境バージョン}
+\end{table}
+
+\subsection{クラウドサービス}
+
+\begin{itemize}
+  \item \textbf{GitHub}: Public or Private Repository
+  \item \textbf{GitHub Packages (GHCR)}: Docker Image Registry
+  \item \textbf{Microsoft OneDrive}: ファイルストレージ
+  \item \textbf{Power Automate}: ビジネスプロセスオートメーション
+\end{itemize}
+
+\section{プロジェクト構成}
+
+完全な自動化には以下のコンポーネントが含まれます：
+
+\begin{lstlisting}[language=bash,caption=プロジェクトフォルダ構成]
+copilot-automation-guide/
+├── README.md                    # メインドキュメント
+├── LICENSE                      # MIT ライセンス
+├── .gitignore                   # Git 除外設定
+├── requirements.txt             # Python 依存
+├── Dockerfile                   # Docker イメージ
+│
+├── .github/workflows/
+│   └── build.yml                # CI/CD パイプライン
+│
+├── latex/
+│   ├── guide.tex                # メイン TeX ファイル
+│   └── sections/                # セクション分割
+│       ├── 01-overview.tex
+│       ├── 02-starter-kit.tex
+│       └── ...
+│
+├── starter-kit/                 # ZIP 化対象
+│   ├── sample-config.yaml
+│   ├── templates/
+│   └── docs/
+│
+├── power-automate/
+│   ├── flow.json                # フロー定義
+│   └── README.md
+│
+└── scripts/
+    └── generate-starter-kit.sh  # ZIP 生成
+\end{lstlisting}
+
+\section{本ガイドの使用方法}
+
+\begin{enumerate}
+  \item \textbf{セクション 1-3}: 基礎知識と構成理解
+  \item \textbf{セクション 4-6}: 技術実装（YAML、Docker、Power Automate）
+  \item \textbf{セクション 7}: セキュリティベストプラクティス
+  \item \textbf{セクション 8-10}: 実装手順、ワークフロー、README 応用
+\end{enumerate}
+
+各セクションには実装例とコード例が含まれており、すぐに活用できます。
+
+\tip{GitHub Copilot を使用して本ガイド内のコード例を拡張・カスタマイズできます。}

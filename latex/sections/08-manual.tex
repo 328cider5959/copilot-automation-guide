@@ -1,0 +1,275 @@
+% 08-manual.tex
+% 実装手順セクション
+
+\chapter{実装手順書}
+
+\section{全体フロー}
+
+本セクションでは、ゼロからプロジェクトを立ち上げるための
+ステップバイステップガイドを提供します。
+
+\subsection{前提条件確認}
+
+\begin{lstlisting}[language=bash,caption=前提条件チェック]
+#!/bin/bash
+
+echo "=== 前提条件チェック ==="
+
+# Git
+git --version || { echo "✗ Git をインストールしてください"; exit 1; }
+
+# Docker
+docker --version || { echo "✗ Docker をインストールしてください"; exit 1; }
+
+# Python
+python3 --version || { echo "✗ Python 3.9+ をインストールしてください"; exit 1; }
+
+# TeX Live (オプション)
+pdflatex --version && echo "✓ LaTeX 環境あり" || echo "⚠ LaTeX なし (PDF 生成スキップ)"
+
+echo "✓ 前提条件チェック完了"
+\end{lstlisting}
+
+\section{ステップ 1: GitHub リポジトリセットアップ}
+
+\subsection{1-1: リポジトリ作成}
+
+\begin{enumerate}
+  \item GitHub にログイン: \url{https://github.com}
+  \item \cmd{New} → リポジトリ作成
+  \item リポジトリ名: \textit{copilot-automation-guide}
+  \item 説明: \textit{Copilot Complete Automation Guide}
+  \item Visibility: \textit{Public} (または Private)
+  \item \cmd{Create repository}
+\end{enumerate}
+
+\subsection{1-2: リポジトリクローン}
+
+\begin{lstlisting}[language=bash,caption=リポジトリクローン]
+git clone https://github.com/YOUR-USERNAME/copilot-automation-guide.git
+cd copilot-automation-guide
+
+# ブランチ確認
+git branch -a
+
+# develop ブランチ作成（推奨）
+git checkout -b develop
+\end{lstlisting}
+
+\subsection{1-3: 初期ファイル配置}
+
+\begin{lstlisting}[language=bash,caption=ファイル配置]
+# リポジトリルート
+touch README.md LICENSE .gitignore
+
+# ディレクトリ作成
+mkdir -p .github/workflows
+mkdir -p latex/sections
+mkdir -p starter-kit/{config,templates,scripts,docs,examples}
+mkdir -p power-automate
+mkdir -p scripts
+
+# 本ガイドから各ファイルをコピー
+\end{lstlisting}
+
+\section{ステップ 2: GitHub Secrets 設定}
+
+\subsection{2-1: Personal Access Token (PAT) 生成}
+
+\begin{enumerate}
+  \item GitHub Settings → \cmd{Developer settings} → \cmd{Personal access tokens}
+  \item \cmd{Generate new token (classic)}
+  \item Token 名: \textit{GHCR_DEPLOYMENT_PAT}
+  \item スコープ: \checkbox{} \cmd{repo}, \checkbox{} \cmd{write:packages}
+  \item \cmd{Generate token}
+  \item トークンをコピーして安全に保存
+\end{enumerate}
+
+\subsection{2-2: Secrets 設定}
+
+\begin{enumerate}
+  \item リポジトリ Settings → \cmd{Secrets and variables} → \cmd{Actions}
+  \item \cmd{New repository secret}
+  \item 以下を追加：
+\end{enumerate}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{シークレット名} & \textbf{値} \\
+\hline
+\cmd{PAT\_TOKEN} & 上記で生成した PAT トークン \\
+\cmd{POWER\_AUTOMATE\_WEBHOOK} & Power Automate Webhook URL \\
+\cmd{GITHUB\_TOKEN} & 自動（リポジトリシークレット） \\
+\hline
+\end{tabularx}
+\caption{GitHub Secrets 設定}
+\end{table}
+
+\section{ステップ 3: ローカル開発環境構築}
+
+\subsection{3-1: Python 仮想環境}
+
+\begin{lstlisting}[language=bash,caption=Python 仮想環境構築]
+# 仮想環境作成
+python3 -m venv venv
+
+# アクティベート
+source venv/bin/activate  # Linux/macOS
+# または
+.\venv\Scripts\activate  # Windows
+
+# 依存関係インストール
+pip install --upgrade pip
+pip install -r requirements.txt
+\end{lstlisting}
+
+\subsection{3-2: Docker ローカルテスト}
+
+\begin{lstlisting}[language=bash,caption=Docker イメージローカルビルド]
+# イメージビルド
+docker build -t copilot-automation:dev .
+
+# コンテナ実行テスト
+mkdir -p input output
+echo "テスト画像" > input/test.txt
+
+docker run --rm \
+  -v $(pwd)/input:/app/input \
+  -v $(pwd)/output:/app/output \
+  copilot-automation:dev
+\end{lstlisting}
+
+\section{ステップ 4: ワークフロー実行}
+
+\subsection{4-1: GitHub Actions ワークフロー トリガー}
+
+\begin{enumerate}
+  \item リポジトリ → \cmd{Actions}
+  \item \cmd{Build and Deploy Pipeline} ワークフロー選択
+  \item \cmd{Run workflow} → \cmd{Run workflow}
+\end{enumerate}
+
+\subsection{4-2: 実行状況確認}
+
+\begin{lstlisting}[language=bash,caption=ワークフロー ログ確認]
+# コマンドラインから確認（gh CLI）
+gh run list
+gh run view <RUN_ID> --log
+\end{lstlisting}
+
+\section{ステップ 5: タグリリース}
+
+\subsection{5-1: バージョンタグ作成}
+
+\begin{lstlisting}[language=bash,caption=リリースタグ作成]
+# バージョンタグ作成
+git tag -a v1.0.0 -m "Release version 1.0.0"
+
+# リモートプッシュ
+git push origin v1.0.0
+
+# タグ確認
+git tag -l
+\end{lstlisting}
+
+\subsection{5-2: GitHub Release 確認}
+
+\begin{enumerate}
+  \item リポジトリ → \cmd{Releases}
+  \item v1.0.0 をクリック
+  \item PDF と Starter Kit ZIP が自動アップロードされていることを確認
+\end{enumerate}
+
+\section{ステップ 6: Power Automate 接続}
+
+\subsection{6-1: Webhook URL 生成}
+
+\begin{enumerate}
+  \item Power Automate → \cmd{Create} → \cmd{Instant cloud flow}
+  \item \cmd{Request} トリガー選択
+  \item \cmd{Save}
+  \item トリガー内の Webhook URL をコピー
+\end{enumerate}
+
+\subsection{6-2: GitHub Secret に登録}
+
+\begin{bash}
+gh secret set POWER_AUTOMATE_WEBHOOK --body "https://prod-xx.westus.logic.azure.com:443/..."
+\end{bash}
+
+\section{ステップ 7: 検証とテスト}
+
+\subsection{7-1: End-to-End テスト}
+
+\begin{lstlisting}[language=bash,caption=E2E テストシーケンス]
+#!/bin/bash
+
+echo "=== End-to-End Test Suite ==="
+
+# 1. LaTeX PDF 生成テスト
+echo "[1/5] Testing LaTeX PDF generation..."
+cd latex
+pdflatex -interaction=nonstopmode guide.tex
+pdflatex -interaction=nonstopmode guide.tex
+if [ -f guide.pdf ]; then echo "✓ PDF OK"; else echo "✗ PDF NG"; fi
+
+# 2. Docker ビルドテスト
+echo "[2/5] Testing Docker build..."
+cd ..
+docker build -t copilot-automation:test . && echo "✓ Docker OK" || echo "✗ Docker NG"
+
+# 3. ZIP 生成テスト
+echo "[3/5] Testing ZIP generation..."
+bash scripts/generate-starter-kit.sh && echo "✓ ZIP OK" || echo "✗ ZIP NG"
+
+# 4. Python 依存テスト
+echo "[4/5] Testing Python dependencies..."
+python -m pip check && echo "✓ Dependencies OK" || echo "✗ Dependencies NG"
+
+# 5. GitHub Secrets テスト
+echo "[5/5] Testing GitHub Secrets..."
+[ -n "$POWER_AUTOMATE_WEBHOOK" ] && echo "✓ Secrets OK" || echo "✗ Secrets NG"
+
+echo "=== Test Complete ==="
+\end{lstlisting}
+
+\subsection{7-2: トラブルシューティング}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|l|}
+\hline
+\textbf{問題} & \textbf{原因} & \textbf{解決策} \\
+\hline
+LaTeX エラー & フォント不足 & \cmd{tlmgr install cjk} \\
+Docker エラー & イメージ大きい & キャッシュクリア \\
+Secret 未設定 & リポジトリ設定ミス & Settings 再確認 \\
+\hline
+\end{tabularx}
+\caption{よくあるトラブルと対応}
+\end{table}
+
+\section{ステップ 8: 本番環境デプロイ}
+
+\subsection{8-1: ブランチ保護設定}
+
+\begin{enumerate}
+  \item Settings → \cmd{Branches} → \cmd{Branch protection rules}
+  \item \cmd{Add rule}
+  \item Branch name pattern: \textit{main}
+  \item \checkbox{} Require status checks
+  \item \checkbox{} Require reviews before merging
+\end{enumerate}
+
+\subsection{8-2: CI/CD パイプライン検証}
+
+\begin{itemize}
+  \item全 Job が成功することを確認
+  \item アーティファクトが正常にアップロードされていることを確認
+  \item Release ページで PDF と ZIP がダウンロード可能か確認
+\end{itemize}
+
+\note{本番環境では必ず develop ブランチで十分なテストを行い、
+その後 main ブランチにマージしてください。}

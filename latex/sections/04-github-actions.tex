@@ -1,0 +1,377 @@
+% 04-github-actions.tex
+% GitHub Actions セクション
+
+\chapter{GitHub Actions YAML ワークフロー}
+
+\section{概要}
+
+GitHub Actions ワークフローは、リポジトリへのプッシュやリリース作成時に
+自動的に実行される CI/CD パイプラインです。
+
+\section{完全な build.yml 実装}
+
+\begin{lstlisting}[language=yaml,caption=.github/workflows/build.yml - 完全版]
+name: Build and Deploy Pipeline
+
+# トリガー条件
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:  # 手動トリガー
+
+# 環境変数（グローバル）
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  LATEX_VERSION: texlive-2024
+
+# 並列ジョブ実行
+jobs:
+  # ========================================
+  # Job 1: LaTeX PDF ビルド
+  # ========================================
+  build-latex:
+    name: Build LaTeX PDF
+    runs-on: ubuntu-latest
+    outputs:
+      pdf_artifact: ${{ steps.build.outputs.pdf_name }}
+    
+    steps:
+      # チェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # LaTeX 環境キャッシュ
+      - name: Cache TeX Live
+        uses: actions/cache@v3
+        with:
+          path: ~/.texlive2024/texmf-var
+          key: ${{ runner.os }}-texlive-${{ env.LATEX_VERSION }}-${{ hashFiles('**/preamble.tex') }}
+          restore-keys: |
+            ${{ runner.os }}-texlive-${{ env.LATEX_VERSION }}-
+      
+      # LaTeX インストール
+      - name: Install LaTeX dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y texlive-full texlive-xetex texlive-lang-japanese
+          sudo apt-get install -y fonts-noto-cjk
+      
+      # PDF ビルド（2 回実行：目次生成用）
+      - name: Build LaTeX PDF
+        id: build
+        run: |
+          cd latex
+          pdflatex -interaction=nonstopmode -halt-on-error guide.tex
+          pdflatex -interaction=nonstopmode -halt-on-error guide.tex
+          echo "pdf_name=guide.pdf" >> $GITHUB_OUTPUT
+          ls -lah *.pdf
+      
+      # ビルド成功確認
+      - name: Verify PDF generation
+        run: |
+          if [ -f "latex/guide.pdf" ]; then
+            echo "✓ PDF ビルド成功"
+            file latex/guide.pdf
+          else
+            echo "✗ PDF ビルド失敗"
+            exit 1
+          fi
+      
+      # PDF をアーティファクトとして保存
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: latex-pdf
+          path: latex/guide.pdf
+          retention-days: 30
+
+  # ========================================
+  # Job 2: Docker イメージビルド
+  # ========================================
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Docker メタデータ生成
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+      
+      # Docker buildx セットアップ
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      
+      # GHCR ログイン
+      - name: Log in to Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Docker イメージビルド & プッシュ
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+  # ========================================
+  # Job 3: スターターキット生成
+  # ========================================
+  create-starter-kit:
+    name: Create Starter Kit ZIP
+    runs-on: ubuntu-latest
+    outputs:
+      zip_path: ${{ steps.create.outputs.zip_path }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Create ZIP file
+        id: create
+        run: |
+          OUTPUT_DIR="output"
+          mkdir -p "$OUTPUT_DIR"
+          
+          ZIP_NAME="starter-kit_${{ github.run_id }}.zip"
+          ZIP_PATH="$OUTPUT_DIR/$ZIP_NAME"
+          
+          cd ..
+          zip -r -q "${{ github.workspace }}/$ZIP_PATH" \
+            "copilot-automation-guide/starter-kit/" \
+            -x "*/.*" "*/__pycache__/*" "*.pyc"
+          
+          echo "zip_path=$ZIP_PATH" >> $GITHUB_OUTPUT
+          ls -lah "$ZIP_PATH"
+      
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: starter-kit
+          path: ${{ steps.create.outputs.zip_path }}
+
+  # ========================================
+  # Job 4: GitHub Release にアップロード
+  # ========================================
+  upload-release:
+    name: Upload to GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-latex, create-starter-kit]
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download PDF artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: latex-pdf
+          path: release-files
+      
+      - name: Download Starter Kit artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: starter-kit
+          path: release-files
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release-files/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ========================================
+  # Job 5: Power Automate トリガー
+  # ========================================
+  trigger-power-automate:
+    name: Trigger Power Automate Flow
+    runs-on: ubuntu-latest
+    needs: upload-release
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Get Release Info
+        id: release
+        run: |
+          RELEASE_TAG=${{ github.ref }}
+          RELEASE_TAG=${RELEASE_TAG#refs/tags/}
+          echo "tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+      
+      - name: Trigger Power Automate Webhook
+        run: |
+          curl -X POST \
+            "${{ secrets.POWER_AUTOMATE_WEBHOOK }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "tag": "${{ steps.release.outputs.tag }}",
+              "repository": "${{ github.repository }}",
+              "releaseUrl": "${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ steps.release.outputs.tag }}",
+              "triggeredBy": "${{ github.actor }}"
+            }'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ========================================
+  # Job 6: テストとバリデーション
+  # ========================================
+  validate:
+    name: Validate Build Artifacts
+    runs-on: ubuntu-latest
+    needs: [build-latex, build-docker, create-starter-kit]
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: List artifacts
+        run: |
+          echo "=== Build Artifacts ===" 
+          find . -type f -name "*.pdf" -o -name "*.zip" | sort
+      
+      - name: Verify file integrity
+        run: |
+          if [ ! -f "latex-pdf/guide.pdf" ]; then
+            echo "✗ PDF が見つかりません"
+            exit 1
+          fi
+          if [ ! -f "starter-kit/"*.zip ]; then
+            echo "✗ Starter Kit ZIP が見つかりません"
+            exit 1
+          fi
+          echo "✓ すべてのアーティファクト確認完了"
+
+# ========================================
+# ワークフロー終了後の処理
+# ========================================
+on-workflow-end:
+  name: Cleanup and Notify
+  runs-on: ubuntu-latest
+  if: always()
+  needs: [build-latex, build-docker, create-starter-kit, validate]
+  
+  steps:
+    - name: Send Slack Notification
+      if: failure()
+      uses: slackapi/slack-github-action@v1
+      with:
+        webhook-url: ${{ secrets.SLACK_WEBHOOK }}
+        payload: |
+          {
+            "text": "Build Pipeline Failed",
+            "details": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          }
+\end{lstlisting}
+
+\section{ワークフロー実行フロー}
+
+\begin{figure}[h]
+\centering
+\begin{verbatim}
+Trigger Event
+    │
+    ├─→ build-latex (並列)
+    │   ├─ Cache TeX Live
+    │   ├─ Install Dependencies
+    │   ├─ pdflatex (2x)
+    │   └─ Upload Artifact
+    │
+    ├─→ build-docker (並列)
+    │   ├─ Extract Metadata
+    │   ├─ Setup Buildx
+    │   ├─ Login to Registry
+    │   └─ Build & Push Image
+    │
+    └─→ create-starter-kit (並列)
+        ├─ Create ZIP
+        └─ Upload Artifact
+         
+    All Jobs Complete
+         │
+         ├─→ validate (依存)
+         │   ├─ Download Artifacts
+         │   └─ Verify Integrity
+         │
+         └─→ upload-release (条件: Tag Push)
+             ├─ Create GitHub Release
+             └─ Upload Files
+                  │
+                  └─→ trigger-power-automate
+                      └─ Call Webhook
+\end{verbatim}
+\caption{ワークフロー実行シーケンス}
+\end{figure}
+
+\section{シークレット設定}
+
+GitHub Settings から以下のシークレットを設定：
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|l|}
+\hline
+\textbf{名前} & \textbf{値} & \textbf{優先度} \\
+\hline
+\cmd{GITHUB\_TOKEN} & 自動設定 & ⭐⭐⭐ \\
+\cmd{POWER\_AUTOMATE\_WEBHOOK} & Webhook URL & ⭐⭐⭐ \\
+\cmd{SLACK\_WEBHOOK} & Slack Webhook (オプション) & ⭐⭐ \\
+\hline
+\end{tabularx}
+\caption{必要なシークレット}
+\end{table}
+
+\section{トラブルシューティング}
+
+\subsection{LaTeX ビルド失敗}
+
+\begin{lstlisting}[language=bash,caption=デバッグ対策]
+# ローカルで pdflatex テスト
+cd latex
+pdflatex -interaction=nonstopmode -halt-on-error guide.tex 2>&1 | tail -20
+\end{lstlisting}
+
+\subsection{Docker ビルド失敗}
+
+原因の可能性：
+\begin{itemize}
+  \item キャッシュレイヤー問題 → \cmd{cache-to: type=gha,mode=max} を確認
+  \item レジストリログイン → \cmd{GITHUB\_TOKEN} 権限を確認
+  \item ディスク容量 → ランナーの空き容量を確認
+\end{itemize}
+
+\tip{GitHub Actions ランナーは 14GB メモリ、160GB SSD を備えています。}

@@ -1,0 +1,261 @@
+%!TEX encoding = UTF-8 Unicode
+% -*- coding: utf-8 -*-
+% Copilot 完全自動化ガイド 最終版
+% LaTeX Ultimate PDF Version
+
+\documentclass[11pt,a4paper,dvipdfmx,uplatex]{jreport}
+
+% ========================================
+% パッケージ読み込み
+% ========================================
+
+% 日本語フォント設定
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% CJK フォント（日本語対応）
+\usepackage[dvipdfmx]{graphicx}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+
+% ハイパーリンク
+\usepackage[dvipdfmx,bookmarks=true,colorlinks=true,
+            linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
+
+% コード表示（listings環境）
+\usepackage{listings}
+\usepackage{jlisting}  % 日本語対応listings
+
+% フォント設定
+\usepackage{xltxtra}
+\usepackage{xunicode}
+\defaultfontfeatures{Mapping=tex-text}
+
+% レイアウト
+\usepackage[margin=25mm,headheight=15pt]{geometry}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+
+% 目次の自動生成
+\usepackage{titletoc}
+\usepackage{tocloft}
+
+% テーブル
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+
+% 日本語フォント（デフォルト設定）
+\renewcommand{\familydefault}{\sfdefault}
+
+% ========================================
+% Listings 環境設定（コード表示）
+% ========================================
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+  commentstyle=\itshape\color{gray},
+  stringstyle=\color{red},
+  breaklines=true,
+  breakatwhitespace=false,
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  firstnumber=1,
+  frame=single,
+  framerule=0pt,
+  rulecolor=\color{lightgray},
+  backgroundcolor=\color{white},
+  xleftmargin=1cm,
+  xrightmargin=0.5cm,
+  captionpos=b,
+  belowcaptionskip=0.5cm,
+  lineskip=-1pt,
+}
+
+% YAML 用 listings スタイル
+\lstdefinelanguage{yaml}{
+  morecomment=[l]{\#},
+  morestring=[b]{"},
+  morestring=[b]{'},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\bfseries\color{blue},
+}
+
+% JSON 用 listings スタイル
+\lstdefinelanguage{json}{
+  morestring=[b]{"},
+  morecomment=[l]{//},
+  basicstyle=\ttfamily\small,
+}
+
+% ========================================
+% ヘッダー・フッター設定
+% ========================================
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Copilot 完全自動化ガイド}
+\fancyhead[R]{最終版}
+\fancyfoot[C]{\thepage\ / \pageref{LastPage}}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% ========================================
+% マクロ定義
+% ========================================
+\newcommand{\cmd}[1]{\texttt{#1}}
+\newcommand{\file}[1]{\texttt{#1}}
+\newcommand{\note}[1]{\textbf{注:} #1}
+\newcommand{\warning}[1]{\textcolor{red}{\textbf{⚠ 警告:}} #1}
+\newcommand{\tip}[1]{\textcolor{green}{\textbf{💡 ヒント:}} #1}
+
+% ========================================
+% ドキュメント開始
+% ========================================
+\title{\Huge\bfseries Copilot 完全自動化ガイド \\ \Large 最終版}
+\author{Copilot Automation Guide Contributors}
+\date{\today}
+
+\begin{document}
+
+% ========================================
+% タイトルページ
+% ========================================
+\maketitle
+
+\begin{abstract}
+このドキュメントは、GitHub Copilot、GitHub Actions、Docker、Power Automate を組み合わせた
+\textbf{完全自動化ガイド}です。本番環境対応のセキュリティベストプラクティスを実装した
+CI/CD パイプライン、LaTeX PDF 自動生成、OCR 処理の自動化を実現します。
+
+\vspace{1em}
+
+\textbf{対象読者}: DevOps エンジニア、自動化担当者、Copilot を活用したい開発者
+
+\vspace{1em}
+
+\textbf{主な内容}:
+\begin{itemize}
+  \item スターターキット構成と使用方法
+  \item ZIP スクリプトによるパッケージング
+  \item GitHub Actions YAML ワークフロー
+  \item Dockerfile による OCR 環境構築
+  \item Power Automate 統合
+  \item セキュリティベストプラクティス
+  \item 実装手順書
+  \item ワークフロー図と README 内容
+\end{itemize}
+\end{abstract}
+
+% ========================================
+% 目次
+% ========================================
+\newpage
+\tableofcontents
+\newpage
+
+% ========================================
+% セクション読み込み
+% ========================================
+
+\input{sections/01-overview}
+\newpage
+
+\input{sections/02-starter-kit}
+\newpage
+
+\input{sections/03-zip-script}
+\newpage
+
+\input{sections/04-github-actions}
+\newpage
+
+\input{sections/05-dockerfile}
+\newpage
+
+\input{sections/06-power-automate}
+\newpage
+
+\input{sections/07-security}
+\newpage
+
+\input{sections/08-manual}
+\newpage
+
+\input{sections/09-workflow}
+\newpage
+
+\input{sections/10-readme}
+
+% ========================================
+% 付録（オプション）
+% ========================================
+\appendix
+
+\chapter{よくある質問（FAQ）}
+
+\section{LaTeX コンパイルができない}
+LaTeX の日本語フォントが不足している場合があります。以下のコマンドで TeX Live を更新してください：
+\begin{lstlisting}[language=bash,label=lst:texupdate]
+tlmgr update --self
+tlmgr install cjk xecjk
+\end{lstlisting}
+
+\section{Docker ビルドが遅い}
+キャッシュレイヤーを活用して高速化できます：
+\begin{lstlisting}[language=bash,label=lst:dockerbuild]
+docker build --cache-from copilot-automation:latest \
+  -t copilot-automation:latest .
+\end{lstlisting}
+
+\section{Power Automate トリガーが動作しない}
+以下を確認してください：
+\begin{enumerate}
+  \item Webhook URL が有効か確認
+  \item GitHub Secrets で \cmd{POWER\_AUTOMATE\_WEBHOOK} が設定されているか
+  \item Power Automate フローが有効か（デザイナーで確認）
+\end{enumerate}
+
+% ========================================
+% 参考資料
+% ========================================
+\chapter{参考資料}
+
+\begin{thebibliography}{99}
+
+\bibitem{github-copilot}
+GitHub Copilot Documentation.
+\textit{https://github.com/features/copilot}
+
+\bibitem{github-actions}
+GitHub Actions Documentation.
+\textit{https://docs.github.com/en/actions}
+
+\bibitem{docker-docs}
+Docker Documentation.
+\textit{https://docs.docker.com}
+
+\bibitem{power-automate}
+Power Automate Documentation.
+\textit{https://powerautomate.microsoft.com}
+
+\bibitem{latex-cjk}
+LaTeX CJK Package Documentation.
+\textit{https://www.ctan.org/pkg/cjk}
+
+\end{thebibliography}
+
+% セクションファイルを読み込む
+\include{sections/overview}
+\include{sections/starter-kit}
+\include{sections/zip-script}
+\include{sections/github-actions}
+\include{sections/dockerfile}
+\include{sections/power-automate}
+\include{sections/security}
+\include{sections/deployment-guide}
+\include{sections/workflow-diagram}
+
+\end{document}

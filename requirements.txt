@@ -1,0 +1,38 @@
+# requirements.txt
+# Python OCR 環境 依存関係
+# Python 3.9+
+# UTF-8 対応
+
+# === OCR & 画像処理 ===
+pytesseract==0.3.10          # Tesseract Python インターフェース
+pillow==10.0.0               # 画像処理ライブラリ
+opencv-python==4.8.0.76      # コンピュータビジョン
+numpy==1.24.3                # 数値計算
+
+# === データ処理 ===
+pandas==2.0.3                # データ分析フレームワーク
+openpyxl==3.1.2             # Excel ファイル処理
+pydantic==2.0.0              # データバリデーション
+
+# === ファイルハンドリング ===
+python-magic-bin==0.4.14    # ファイル型認識
+
+# === ロギング & モニタリング ===
+python-json-logger==2.0.7   # JSON ロギング
+prometheus-client==0.17.1   # Prometheus メトリクス
+
+# === Web & API ===
+requests==2.31.0            # HTTP ライブラリ
+httpx==0.24.1               # 非同期 HTTP クライアント
+
+# === 設定管理 ===
+python-dotenv==1.0.0        # .env ファイル読み込み
+
+# === 開発 & テスト ===
+pytest==7.4.0               # テストフレームワーク
+pytest-cov==4.1.0           # カバレッジ測定
+black==23.7.0               # コードフォーマッター
+flake8==6.0.0               # リンター
+
+# === セキュリティ ===
+cryptography==41.0.3        # 暗号化ライブラリ

@@ -1,0 +1,408 @@
+% 06-power-automate.tex
+% Power Automate セクション
+
+\chapter{Power Automate フロー統合}
+
+\section{概要}
+
+Power Automate は、GitHub Release からのファイルダウンロード、OCR 処理、
+結果の OneDrive 保存を自動化するクラウドベースのワークフローエンジンです。
+
+\section{フロー定義 JSON}
+
+\begin{lstlisting}[language=json,caption=power-automate/flow.json]
+{
+  "displayName": "Copilot Automation - Release OCR Pipeline",
+  "description": "GitHub Release ZIP をダウンロード、OCR 処理、
+    結果を OneDrive に保存",
+  "triggers": [
+    {
+      "name": "manual",
+      "type": "Request",
+      "kind": "Http",
+      "properties": {
+        "schema": {
+          "$schema": "http://json-schema.org/draft-04/schema#",
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "GitHub Release タグ"
+            },
+            "repository": {
+              "type": "string",
+              "description": "リポジトリ名"
+            },
+            "releaseUrl": {
+              "type": "string",
+              "description": "Release URL"
+            }
+          },
+          "required": ["tag", "repository", "releaseUrl"]
+        }
+      }
+    }
+  ],
+  "actions": [
+    {
+      "name": "Initialize Variables",
+      "type": "InitializeVariable",
+      "properties": {
+        "variables": [
+          {
+            "name": "WorkspaceId",
+            "type": "String",
+            "value": "@triggerBody()?['repository']"
+          },
+          {
+            "name": "ZipUrl",
+            "type": "String",
+            "value": ""
+          },
+          {
+            "name": "OcrResults",
+            "type": "Array",
+            "value": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "Get Release Assets",
+      "type": "Http",
+      "properties": {
+        "method": "GET",
+        "uri": "@concat('https://api.github.com/repos/',
+          triggerBody()?['repository'],
+          '/releases/tags/',
+          triggerBody()?['tag'])",
+        "headers": {
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Authorization": "@concat('Bearer ',
+            triggerBody()?['github_token'])"
+        }
+      }
+    },
+    {
+      "name": "Parse Release Response",
+      "type": "ParseJson",
+      "properties": {
+        "content": "@body('Get Release Assets')",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "assets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "browser_download_url": {"type": "string"},
+                  "size": {"type": "integer"}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Filter ZIP File",
+      "type": "Filter",
+      "properties": {
+        "from": "@body('Parse Release Response')?['assets']",
+        "where": "@endsWith(item()?['name'], '.zip')"
+      }
+    },
+    {
+      "name": "Download ZIP File",
+      "type": "Http",
+      "properties": {
+        "method": "GET",
+        "uri": "@body('Filter ZIP File')[0]?['browser_download_url']",
+        "headers": {}
+      }
+    },
+    {
+      "name": "Create Temporary File",
+      "type": "SharePointOnlineSendAnHTTPRequestToSharePoint",
+      "properties": {
+        "method": "POST",
+        "uri": "@concat('https://www.sharepoint.com/sites/',
+          variables('WorkspaceId'),
+          '/_api/web/GetFileByServerRelativeUrl(',
+          '''/sites/WorkspaceId/Shared Documents/temp-',
+          utcNow('yyyyMMddHHmmss'),
+          '.zip'',
+          ')/StartUpload')",
+        "body": "@body('Download ZIP File')"
+      }
+    },
+    {
+      "name": "Extract ZIP Contents",
+      "type": "Http",
+      "properties": {
+        "method": "POST",
+        "uri": "@concat(
+          'https://your-docker-registry.azurewebsites.net/extract',
+          '?zipUrl=',
+          encodeUriComponent(body('Create Temporary File')?['uri']
+          )
+        )",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "@concat('Bearer ',
+            parameters('DockerApiKey'))"
+        },
+        "body": {
+          "action": "extract",
+          "format": "zip"
+        }
+      }
+    },
+    {
+      "name": "Process with OCR",
+      "type": "Http",
+      "properties": {
+        "method": "POST",
+        "uri": "@parameters('OcrServiceEndpoint')",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "@concat('Bearer ',
+            parameters('OcrApiKey'))"
+        },
+        "body": {
+          "operation": "ocr",
+          "language": "jpn+eng",
+          "sourceUri": "@body('Extract ZIP Contents')?['extractUri']"
+        }
+      }
+    },
+    {
+      "name": "Convert to CSV",
+      "type": "Html2text",
+      "properties": {
+        "html": "@body('Process with OCR')?['results']",
+        "format": "csv",
+        "encoding": "utf-8"
+      }
+    },
+    {
+      "name": "Save to OneDrive",
+      "type": "SharePointOnlineSendAnHTTPRequestToSharePoint",
+      "properties": {
+        "method": "POST",
+        "uri": "@concat(
+          'https://graph.microsoft.com/v1.0/me/drive/root:',
+          '/OCR_Results_',
+          triggerBody()?['tag'],
+          '.csv:/content'
+        )",
+        "headers": {
+          "Content-Type": "text/csv",
+          "Authorization": "@concat('Bearer ',
+            parameters('MsGraphToken'))"
+        },
+        "body": "@body('Convert to CSV')"
+      }
+    },
+    {
+      "name": "Send Completion Notification",
+      "type": "SendEmail",
+      "properties": {
+        "to": "@parameters('NotificationEmail')",
+        "subject": "@concat(
+          'OCR Processing Complete - ',
+          triggerBody()?['tag']
+        )",
+        "body": "@concat(
+          '<p>Processing completed successfully.</p>',
+          '<p>Release: ',
+          triggerBody()?['tag'],
+          '</p>',
+          '<p>Results saved to OneDrive.</p>'
+        )"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "ProcessingStatus",
+      "type": "String",
+      "value": "Completed"
+    },
+    {
+      "name": "ResultFile",
+      "type": "String",
+      "value": "@outputs('Save to OneDrive')"
+    }
+  ]
+}
+\end{lstlisting}
+
+\section{フロー構成図}
+
+\begin{figure}[h]
+\centering
+\begin{verbatim}
+┌──────────────────────────────────────────┐
+│   Webhook トリガー                        │
+│  (GitHub Actions から呼び出し)            │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   変数初期化                              │
+│   - WorkspaceId                         │
+│   - ZipUrl, OcrResults                 │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   GitHub API: Release 取得               │
+│   GET /repos/{owner}/{repo}/releases   │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   ZIP ファイルをフィルタ                 │
+│   (assets から .zip を検出)              │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   ZIP ダウンロード                        │
+│   (ブラウザダウンロード URL)             │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   一時ファイル作成 (OneDrive)             │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   Docker サービス: ZIP 展開               │
+│   (Docker HTTP エンドポイント)           │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   OCR 処理                                │
+│   (Docker コンテナで実行)                │
+│   言語: 日本語 + 英語                     │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   CSV 変換                                │
+│   (HTML テーブル → CSV)                  │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   OneDrive 保存                           │
+│   /OCR_Results_{tag}.csv                │
+└────────────────┬─────────────────────────┘
+                 │
+                 ▼
+┌──────────────────────────────────────────┐
+│   完了通知メール送信                     │
+└──────────────────────────────────────────┘
+\end{verbatim}
+\caption{Power Automate フロー実行フロー}
+\end{figure}
+
+\section{セットアップ手順}
+
+\subsection{ステップ 1: Power Automate にインポート}
+
+\begin{enumerate}
+  \item Power Automate にログイン: \url{https://powerautomate.microsoft.com}
+  \item \cmd{My flows} → \cmd{Create} → \cmd{Instant cloud flow} → \cmd{Automated}
+  \item フロー名入力: \textit{Copilot Automation - Release OCR Pipeline}
+  \item \cmd{Create}
+  \item \cmd{＋ New step} → \cmd{Parse JSON}
+\end{enumerate}
+
+\subsection{ステップ 2: コネクション設定}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{コネクション} & \textbf{設定} \\
+\hline
+GitHub & GitHub アカウント認証 \\
+SharePoint & Office 365 アカウント \\
+OneDrive & OneDrive アカウント \\
+HTTP & Docker API キー \\
+\hline
+\end{tabularx}
+\caption{必要なコネクション}
+\end{table}
+
+\subsection{ステップ 3: パラメータ設定}
+
+\begin{lstlisting}[caption=フロー パラメータ]
+DockerApiKey: <Docker Registry API キー>
+OcrServiceEndpoint: https://your-docker.azurewebsites.net/api/ocr
+OcrApiKey: <OCR サービス API キー>
+MsGraphToken: <Microsoft Graph トークン>
+NotificationEmail: admin@example.com
+\end{lstlisting}
+
+\section{エラーハンドリング}
+
+\begin{lstlisting}[language=json,caption=エラー ハンドラーアクション]
+{
+  "name": "On Error Handler",
+  "type": "Scope",
+  "properties": {
+    "runAfter": {
+      "Process with OCR": ["Failed", "TimedOut"]
+    },
+    "actions": [
+      {
+        "name": "Log Error",
+        "type": "Http",
+        "properties": {
+          "method": "POST",
+          "uri": "@parameters('LoggingEndpoint')",
+          "body": {
+            "error": "@body('Process with OCR')",
+            "timestamp": "@utcNow()"
+          }
+        }
+      },
+      {
+        "name": "Send Error Notification",
+        "type": "SendEmail",
+        "properties": {
+          "to": "@parameters('AdminEmail')",
+          "subject": "OCR Processing Failed",
+          "body": "@concat(
+            '<p>Error: ',
+            body('Process with OCR')?['error'],
+            '</p>'
+          )"
+        }
+      }
+    ]
+  }
+}
+\end{lstlisting}
+
+\section{ベストプラクティス}
+
+\begin{itemize}
+  \item \textbf{タイムアウト管理}: 長時間処理には \cmd{timeout: 3600} を設定
+  \item \textbf{リトライポリシー}: \cmd{retryPolicy} で自動リトライ有効化
+  \item \textbf{ログ記録}: 全アクション出力を Azure Log Analytics に送信
+  \item \textbf{通知}: 完了/エラーメール、Slack 通知の実装
+  \item \textbf{セキュリティ}: シークレット値は \cmd{@parameters()} で参照
+\end{itemize}
+
+\tip{Power Automate Premium ライセンスで、
+カスタムコネクタや高度なスケジューリングが利用可能です。}

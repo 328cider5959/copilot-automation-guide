@@ -1,0 +1,164 @@
+name: Build and Release
+
+# ワークフロー実行のトリガー
+on:
+  push:
+    # main ブランチへのプッシュで自動実行
+    branches: [ main ]
+    # タグでリリースをトリガーしたい場合は以下を有効化
+    # tags: ['v*']
+  workflow_dispatch: {}
+
+# 環境変数
+env:
+  LATEX_BUILD_DIR: latex
+  STARTER_KIT_DIR: starter-kit
+  ARTIFACTS_DIR: artifacts
+
+jobs:
+  # PDF ビルドジョブ: Makefile または pdflatex で guide.tex をビルド
+  # キャッシュ: TeX Live の auxiliary ディレクトリをキャッシュして高速化
+  build_pdf:
+    runs-on: ubuntu-latest
+    # 並列実行される複数ジョブの一つ
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache TeXLive auxiliary directories
+        # TeXLive の大きなインストールの再利用を試みるためのキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.texmf-var
+            ~/.texlive*
+          key: ${{ runner.os }}-tex-${{ hashFiles('latex/**', 'templates/**') }}
+
+      - name: Install TeX Live (必要なパッケージのみ)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
+            texlive-lang-japanese latexmk
+
+      - name: Build guide.pdf (Makefile を使用)
+        working-directory: latex
+        run: |
+          # Makefile が存在する場合は make を使用、なければ直接 pdflatex を実行
+          if [ -f Makefile ]; then
+            echo "Makefile found. Using make pdf..."
+            make pdf
+          else
+            echo "Makefile not found. Using direct pdflatex..."
+            set -e
+            pdflatex -interaction=nonstopmode guide.tex
+            pdflatex -interaction=nonstopmode guide.tex
+          fi
+
+      - name: Verify PDF output
+        run: |
+          if [ -f latex/guide.pdf ]; then
+            echo "✓ PDF generated successfully"
+            ls -lh latex/guide.pdf
+          else
+            echo "✗ PDF not found"
+            exit 1
+          fi
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: guide-pdf
+          path: latex/guide.pdf
+
+  # ZIP 作成ジョブ: 改善済みスクリプトを使用して starter-kit をアーカイブ
+  build_zip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache starter-kit contents (変更が無ければキャッシュを利用)
+        uses: actions/cache@v4
+        with:
+          path: starter-kit
+          key: ${{ runner.os }}-starterkit-${{ hashFiles('starter-kit/**') }}
+
+      - name: Run improved ZIP generation script
+        # 改善済みスクリプト: .gitignore を参照して除外パターンを自動適用
+        run: |
+          # スクリプトに実行権限を付与
+          chmod +x scripts/generate-starter-kit.sh
+          
+          # スクリプト実行（UTF-8対応、.gitignore参照）
+          bash scripts/generate-starter-kit.sh
+          
+          # 生成された ZIP を確認
+          ls -lh output/starter-kit*.zip
+
+      - name: Upload ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: starter-kit-zip
+          path: output/starter-kit-*.zip
+
+  # リリース作成ジョブ: PDF と ZIP をダウンロードして GitHub Release にアップロード
+  release:
+    needs: [build_pdf, build_zip]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (for metadata)
+        uses: actions/checkout@v4
+
+      - name: Download PDF artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: guide-pdf
+          path: artifacts
+
+      - name: Download ZIP artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: starter-kit-zip
+          path: artifacts
+
+      - name: List downloaded artifacts
+        run: |
+          echo "=== Downloaded artifacts ==="
+          ls -lh artifacts/
+          echo ""
+          echo "Total artifacts:"
+          find artifacts -type f -exec ls -lh {} \;
+
+      - name: Create GitHub Release with assets
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name || format('release-{0}', github.run_number) }}
+          name: ${{ github.ref_name || format('Release {0}', github.run_number) }}
+          body: |
+            ## 自動生成リリース
+            
+            このリリースには以下が含まれています:
+            - `guide.pdf` - LaTeX でビルドされたドキュメント
+            - `starter-kit-*.zip` - starter-kit アーカイブ（.gitignore を参照して除外）
+            
+            生成日時: ${{ github.event.head_commit.timestamp }}
+            ワークフロー実行: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          files: |
+            artifacts/guide.pdf
+            artifacts/starter-kit-*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release summary
+        if: success()
+        run: |
+          echo "✓ Release created successfully!"
+          echo ""
+          echo "Release Info:"
+          echo "  Tag: ${{ github.ref_name || format('release-{0}', github.run_number) }}"
+          echo "  URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name || format('release-{0}', github.run_number) }}"
+          echo ""
+          echo "Assets:"
+          ls -lh artifacts/

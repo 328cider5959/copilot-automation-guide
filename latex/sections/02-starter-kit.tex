@@ -1,0 +1,199 @@
+% 02-starter-kit.tex
+% スターターキット構成セクション
+
+\chapter{スターターキット構成}
+
+\section{スターターキットの概要}
+
+スターターキット (\file{starter-kit/}) は、プロジェクト開始時に必要な全テンプレート、
+設定ファイル、ドキュメントをまとめたパッケージです。
+
+\subsection{目的}
+
+\begin{itemize}
+  \item 新しいプロジェクト立ち上げの高速化
+  \item 標準的なファイル構造の提供
+  \item ベストプラクティスの実装例
+  \item セキュリティ設定の自動化
+\end{itemize}
+
+\section{ディレクトリ構造}
+
+\begin{lstlisting}[language=bash,caption=スターターキットの構成]
+starter-kit/
+├── README.md                      # スターターキット ガイド
+├── CONTRIBUTING.md                # 貢献ガイドライン
+│
+├── config/
+│   ├── github-actions.yaml        # GitHub Actions テンプレート
+│   ├── docker-compose.yml         # Docker Compose 設定
+│   ├── .env.example               # 環境変数テンプレート
+│   └── security-policy.md         # セキュリティポリシー
+│
+├── templates/
+│   ├── issue-template.md          # Issue テンプレート
+│   ├── pr-template.md             # Pull Request テンプレート
+│   ├── dockerfile.template        # Dockerfile テンプレート
+│   ├── workflow.yaml.template     # ワークフロー YAML テンプレート
+│   └── python-main.py.template    # Python スクリプト テンプレート
+│
+├── scripts/
+│   ├── setup.sh                   # 初期セットアップ スクリプト
+│   ├── validate.sh                # 設定検証スクリプト
+│   ├── deploy.sh                  # デプロイスクリプト
+│   └── README.md                  # スクリプト ドキュメント
+│
+├── docs/
+│   ├── GETTING_STARTED.md         # 始め方ガイド
+│   ├── ARCHITECTURE.md            # アーキテクチャ説明
+│   ├── DEPLOYMENT.md              # デプロイ手順
+│   ├── TROUBLESHOOTING.md         # トラブルシューティング
+│   └── FAQ.md                     # よくある質問
+│
+└── examples/
+    ├── python/
+    │   ├── main.py
+    │   └── requirements.txt
+    ├── bash/
+    │   ├── example.sh
+    │   └── utilities.sh
+    └── yaml/
+        ├── workflow-example.yaml
+        └── docker-compose-example.yml
+\end{lstlisting}
+
+\section{各ファイルの説明}
+
+\subsection{設定ファイル (config/)}
+
+\begin{description}
+  \item[\file{github-actions.yaml}] GitHub Actions ワークフロー設定テンプレート
+  \item[\file{docker-compose.yml}] ローカル開発環境用 Docker Compose
+  \item[\file{.env.example}] 環境変数テンプレート（本番では \file{.env} に改名）
+  \item[\file{security-policy.md}] 脆弱性報告ポリシー
+\end{description}
+
+\subsection{テンプレート (templates/)}
+
+\begin{lstlisting}[caption=Issue テンプレート例]
+<!-- issue-template.md -->
+## 問題の説明
+<!-- 何が起きたか簡潔に説明 -->
+
+## 再現手順
+1. ステップ 1
+2. ステップ 2
+3. ステップ 3
+
+## 期待される動作
+<!-- 何が起こるべきだったか -->
+
+## 実際の動作
+<!-- 実際に起きたこと -->
+
+## スクリーンショット（オプション）
+<!-- スクリーンショットを添付 -->
+
+## 環境情報
+- OS: 
+- Docker Version: 
+- Python Version: 
+\end{lstlisting}
+
+\subsection{スクリプト (scripts/)}
+
+\begin{table}[h]
+\centering
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{スクリプト} & \textbf{機能} \\
+\hline
+\file{setup.sh} & 環境の初期セットアップ（Python venv、依存関係インストール等） \\
+\file{validate.sh} & 設定ファイル、環境変数、依存関係の検証 \\
+\file{deploy.sh} & Docker イメージビルドと GHCR へのプッシュ \\
+\hline
+\end{tabularx}
+\caption{スターターキット スクリプト}
+\end{table}
+
+\section{使用開始手順}
+
+\subsection{ステップ 1: ZIP から展開}
+
+\begin{lstlisting}[language=bash,caption=スターターキット展開]
+unzip starter-kit.zip
+cd starter-kit
+\end{lstlisting}
+
+\subsection{ステップ 2: 初期セットアップ実行}
+
+\begin{lstlisting}[language=bash,caption=セットアップスクリプト実行]
+bash scripts/setup.sh
+\end{lstlisting}
+
+\subsection{ステップ 3: 環境変数設定}
+
+\begin{lstlisting}[language=bash,caption=環境変数ファイル作成]
+cp config/.env.example .env
+# .env をテキストエディタで編集して、実際の値を設定
+\end{lstlisting}
+
+\subsection{ステップ 4: 設定検証}
+
+\begin{lstlisting}[language=bash,caption=設定検証実行]
+bash scripts/validate.sh
+\end{lstlisting}
+
+\section{カスタマイズガイド}
+
+\subsection{独自の GitHub Actions ワークフロー作成}
+
+\begin{lstlisting}[language=yaml,caption=カスタム ワークフロー例]
+name: Custom Build Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Run tests
+        run: python -m pytest
+\end{lstlisting}
+
+\subsection{Docker イメージのカスタマイズ}
+
+\begin{lstlisting}[language=dockerfile,caption=カスタム Dockerfile]
+FROM python:3.11-slim
+
+# 作業ディレクトリ設定
+WORKDIR /app
+
+# 依存関係インストール
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# アプリケーション コピー
+COPY . .
+
+# デフォルト コマンド
+CMD ["python", "main.py"]
+\end{lstlisting}
+
+\section{ベストプラクティス}
+
+\begin{itemize}
+  \item \textbf{バージョン管理}: スターターキットも Git で管理する
+  \item \textbf{ドキュメント}: 変更時は対応するドキュメントも更新
+  \item \textbf{テスト}: 新規スクリプト追加時は自動テストを含める
+  \item \textbf{セキュリティ}: センシティブ情報は環境変数に移行
+\end{itemize}
+
+\tip{スターターキットは GitHub Templates リポジトリとしても利用できます。}

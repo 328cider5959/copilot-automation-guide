@@ -1,0 +1,271 @@
+{
+  "displayName": "Copilot Automation - Release OCR Pipeline",
+  "description": "GitHub Release ZIP をダウンロード、OCR 処理実行、結果を OneDrive に保存",
+  "schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowDefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {},
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "Http",
+      "inputs": {
+        "schema": {
+          "$schema": "http://json-schema.org/draft-04/schema#",
+          "type": "object",
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "GitHub Release タグ"
+            },
+            "repository": {
+              "type": "string",
+              "description": "リポジトリ名 (owner/repo)"
+            },
+            "releaseUrl": {
+              "type": "string",
+              "description": "Release URL"
+            },
+            "triggeredBy": {
+              "type": "string",
+              "description": "トリガーした GitHub ユーザー"
+            }
+          },
+          "required": ["tag", "repository", "releaseUrl"]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Initialize_Variables": {
+      "type": "Compose",
+      "inputs": {
+        "WorkspaceId": "@triggerBody()?['repository']",
+        "ReleaseTag": "@triggerBody()?['tag']",
+        "Timestamp": "@utcNow('yyyyMMdd_HHmmss')"
+      },
+      "runAfter": {}
+    },
+    "Get_Release_Assets": {
+      "type": "Http",
+      "inputs": {
+        "method": "GET",
+        "uri": "@concat('https://api.github.com/repos/', triggerBody()?['repository'], '/releases/tags/', triggerBody()?['tag'])",
+        "headers": {
+          "Accept": "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Authorization": "@concat('token ', triggerBody()?['github_token'])"
+        }
+      },
+      "runAfter": {
+        "Initialize_Variables": ["Succeeded"]
+      }
+    },
+    "Parse_Release_Response": {
+      "type": "ParseJson",
+      "inputs": {
+        "content": "@body('Get_Release_Assets')",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "assets": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "browser_download_url": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "integer"
+                  }
+                }
+              }
+            },
+            "tag_name": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Get_Release_Assets": ["Succeeded"]
+      }
+    },
+    "Filter_ZIP_Files": {
+      "type": "Query",
+      "inputs": {
+        "from": "@body('Parse_Release_Response')?['assets']",
+        "where": "@endsWith(item()?['name'], '.zip')"
+      },
+      "runAfter": {
+        "Parse_Release_Response": ["Succeeded"]
+      }
+    },
+    "Download_ZIP_File": {
+      "type": "Http",
+      "inputs": {
+        "method": "GET",
+        "uri": "@body('Filter_ZIP_Files')[0]?['browser_download_url']",
+        "headers": {}
+      },
+      "runAfter": {
+        "Filter_ZIP_Files": ["Succeeded"]
+      }
+    },
+    "Save_ZIP_to_OneDrive": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "onedrivebusiness"
+          }
+        },
+        "method": "post",
+        "path": "/datasets/default/files",
+        "queries": {
+          "folderPath": "/Copilot/Downloads",
+          "name": "@concat('starter-kit_', outputs('Initialize_Variables')?['ReleaseTag'], '.zip')",
+          "queryParametersSingleEncoded": true
+        },
+        "body": "@body('Download_ZIP_File')"
+      },
+      "runAfter": {
+        "Download_ZIP_File": ["Succeeded"]
+      }
+    },
+    "Extract_and_Process": {
+      "type": "Http",
+      "inputs": {
+        "method": "POST",
+        "uri": "@parameters('DockerOcrEndpoint')",
+        "headers": {
+          "Content-Type": "application/json",
+          "Authorization": "@concat('Bearer ', parameters('DockerApiKey'))"
+        },
+        "body": {
+          "operation": "ocr",
+          "language": "jpn+eng",
+          "sourceFile": "@body('Save_ZIP_to_OneDrive')?['Path']",
+          "outputFormat": "csv"
+        },
+        "timeout": "PT3600S"
+      },
+      "runAfter": {
+        "Save_ZIP_to_OneDrive": ["Succeeded"]
+      }
+    },
+    "Convert_Results_to_CSV": {
+      "type": "Compose",
+      "inputs": {
+        "Results": "@body('Extract_and_Process')?['csvContent']"
+      },
+      "runAfter": {
+        "Extract_and_Process": ["Succeeded"]
+      }
+    },
+    "Save_Results_to_OneDrive": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "onedrivebusiness"
+          }
+        },
+        "method": "post",
+        "path": "/datasets/default/files",
+        "queries": {
+          "folderPath": "/Copilot/Results",
+          "name": "@concat('ocr_results_', outputs('Initialize_Variables')?['ReleaseTag'], '_', outputs('Initialize_Variables')?['Timestamp'], '.csv')",
+          "queryParametersSingleEncoded": true
+        },
+        "body": "@outputs('Convert_Results_to_CSV')?['Results']"
+      },
+      "runAfter": {
+        "Convert_Results_to_CSV": ["Succeeded"]
+      }
+    },
+    "Send_Success_Notification": {
+      "type": "ApiConnection",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "outlook"
+          }
+        },
+        "method": "post",
+        "path": "/v2/Mail",
+        "body": {
+          "from": "@parameters('SenderEmail')",
+          "to": "@parameters('NotificationEmail')",
+          "subject": "@concat('✓ OCR Processing Complete - ', outputs('Initialize_Variables')?['ReleaseTag'])",
+          "htmlBody": "@concat('<h2>OCR Processing Completed Successfully</h2><p><strong>Release:</strong> ', outputs('Initialize_Variables')?['ReleaseTag'], '</p><p><strong>Repository:</strong> ', triggerBody()?['repository'], '</p><p><strong>Processed at:</strong> ', outputs('Initialize_Variables')?['Timestamp'], '</p><p><strong>Results file:</strong> ocr_results_', outputs('Initialize_Variables')?['ReleaseTag'], '.csv</p><p><strong>Location:</strong> OneDrive:/Copilot/Results</p>')",
+          "importance": "normal"
+        }
+      },
+      "runAfter": {
+        "Save_Results_to_OneDrive": ["Succeeded"]
+      }
+    },
+    "Handle_Errors": {
+      "type": "Scope",
+      "actions": {
+        "Log_Error": {
+          "type": "Http",
+          "inputs": {
+            "method": "POST",
+            "uri": "@parameters('LoggingEndpoint')",
+            "headers": {
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "timestamp": "@utcNow()",
+              "error": "@body('Get_Release_Assets')?['message']",
+              "releaseTag": "@outputs('Initialize_Variables')?['ReleaseTag']",
+              "repository": "@triggerBody()?['repository']",
+              "action": "ProcessRelease"
+            }
+          }
+        },
+        "Send_Error_Notification": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "outlook"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "from": "@parameters('SenderEmail')",
+              "to": "@parameters('AdminEmail')",
+              "subject": "@concat('✗ OCR Processing Failed - ', outputs('Initialize_Variables')?['ReleaseTag'])",
+              "htmlBody": "@concat('<h2 style=\"color: red;\">OCR Processing Failed</h2><p><strong>Release:</strong> ', outputs('Initialize_Variables')?['ReleaseTag'], '</p><p><strong>Repository:</strong> ', triggerBody()?['repository'], '</p><p><strong>Error:</strong> ', body('Get_Release_Assets')?['message'], '</p><p>Please check the logs for details.</p>'))",
+              "importance": "high"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Extract_and_Process": ["Failed"]
+      }
+    }
+  },
+  "outputs": {
+    "ProcessingStatus": {
+      "type": "String",
+      "value": "Completed"
+    },
+    "ResultFile": {
+      "type": "String",
+      "value": "@body('Save_Results_to_OneDrive')?['Name']"
+    },
+    "ResultLocation": {
+      "type": "String",
+      "value": "@body('Save_Results_to_OneDrive')?['Path']"
+    }
+  }
+}
