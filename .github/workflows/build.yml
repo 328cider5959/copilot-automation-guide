@@ -11,34 +11,39 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. リポジトリをチェックアウト
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Install LaTeX
-        run: sudo apt-get update && sudo apt-get install -y texlive-latex-extra latexmk zip
+      # 2. 日本語対応LaTeX環境をインストール
+      - name: Install LaTeX (Japanese support)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            texlive-lang-japanese \
+            texlive-latex-extra \
+            texlive-fonts-recommended \
+            texlive-fonts-extra \
+            latexmk zip
 
+      # 3. LaTeXビルド（latexmk + uplatex）
       - name: Build PDF using Makefile
         run: |
           cd latex
-          make pdf
+          make latexmk
 
+      # 4. ZIP生成スクリプト実行
       - name: Run ZIP script
         run: |
           chmod +x scripts/zip.sh
           ./scripts/zip.sh
 
-      - name: Upload Release Assets
-        uses: actions/upload-release-asset@v1
+      # 5. GitHub Release作成＆成果物アップロード
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: latex/guide.pdf
-          asset_name: guide.pdf
-          asset_content_type: application/pdf
-
-      - name: Upload Starter Kit ZIP
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ github.event.release.upload_url }}
-          asset_path: starter-kit.zip
-          asset_name: starter-kit.zip
-          asset_content_type: application/zip
+          files: |
+            latex/guide.pdf
+            starter-kit.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
