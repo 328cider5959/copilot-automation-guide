@@ -78,46 +78,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Cache starter-kit contents (変更が無ければキャッシュを利用)
-        uses: actions/cache@v4
-        with:
-          path: starter-kit
-          key: ${{ runner.os }}-starterkit-${{ hashFiles('starter-kit/**') }}
-
-      - name: Run improved ZIP generation script
-        # 改善済みスクリプト: .gitignore を参照して除外パターンを自動適用
+      - name: Create ZIP directly (簡潔版)
         run: |
-          # スクリプトに実行権限を付与
-          chmod +x scripts/generate-starter-kit.sh
+          # 出力ディレクトリ作成
+          mkdir -p output
           
-          # スクリプト実行（UTF-8対応、.gitignore参照）
-          bash scripts/generate-starter-kit.sh || { echo "Script failed with exit code $?"; exit 1; }
-          
-          # 生成された ZIP を確認
-          echo "=== Checking for ZIP files ==="
-          if [ -d output ]; then
-            ls -lh output/ || echo "output directory is empty"
-          else
-            echo "output directory does not exist!"
+          # starter-kit フォルダを ZIP に圧縮
+          echo "Creating ZIP from starter-kit folder..."
+          zip -r -q output/starter-kit.zip starter-kit -x "starter-kit/.git/*" "starter-kit/.env" || {
+            echo "Error: ZIP creation failed"
+            ls -la starter-kit/
             exit 1
-          fi
-
-      - name: List all artifacts before upload
-        run: |
-          echo "=== Files in current directory ==="
-          find . -name "*.zip" -type f
+          }
           
-          echo "=== Contents of output directory ==="
-          if [ -d output ]; then
-            ls -la output/
-          fi
+          # 結果確認
+          echo "=== ZIP created successfully ==="
+          ls -lh output/starter-kit.zip
+          
+          # ZIP 内容確認
+          echo ""
+          echo "=== ZIP file contents ==="
+          unzip -l output/starter-kit.zip | head -20
 
       - name: Upload ZIP artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: starter-kit-zip
-          path: output/starter-kit-*.zip
+          path: output/starter-kit.zip
+          if-no-files-found: warn
 
   # リリース作成ジョブ: PDF と ZIP をダウンロードして GitHub Release にアップロード
   release:
@@ -154,16 +143,20 @@ jobs:
           if [ -f artifacts/guide.pdf ]; then
             cp artifacts/guide.pdf release_files/
             echo "✓ PDF copied"
+          else
+            echo "✗ PDF not found"
           fi
           
           # ZIP をコピー（存在する場合）
-          if [ -f artifacts/starter-kit-*.zip ]; then
-            cp artifacts/starter-kit-*.zip release_files/ 2>/dev/null || true
+          if ls artifacts/starter-kit*.zip 1> /dev/null 2>&1; then
+            cp artifacts/starter-kit*.zip release_files/
             echo "✓ ZIP copied"
           else
             echo "⚠ ZIP not found (will create release with PDF only)"
           fi
           
+          echo ""
+          echo "=== Release files ready ==="
           ls -lh release_files/
 
       - name: Create GitHub Release with assets
