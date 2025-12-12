@@ -9,15 +9,18 @@
 % パッケージ読み込み
 % ========================================
 
-% UTF-8 エンコーディング対応（XeLaTeX）
-\usepackage[UTF-8]{fontspec}
+% XeLaTeX で UTF-8 を直接サポート（オプション不要）
+\usepackage{fontspec}
 
-% 日本語フォント設定（XeLaTeX）
-\usepackage{xeCJK}
-\setCJKmainfont{IPAMincho}      % 日本語メインフォント
-\setCJKsansfont{IPAGothic}      % 日本語サンスセリフ
-\setmainfont{Libertinus Serif}  % 英数字フォント
-\setsansfont{Libertinus Sans}
+% 日本語フォント設定（シンプル方式）
+% XeLaTeX はデフォルトで UTF-8 対応、フォント名で直接指定
+\setmainfont{Liberation Serif}
+\setsansfont{Liberation Sans}
+\setmonofont{Liberation Mono}
+
+% CJK フォント（日本語）- 代替パッケージ使用
+\usepackage{polyglossia}
+\setmainlanguage{japanese}
 
 % 画像対応
 \usepackage{graphicx}

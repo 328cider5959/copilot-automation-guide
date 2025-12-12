@@ -39,7 +39,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             texlive-xetex texlive-latex-extra texlive-fonts-recommended \
-            texlive-lang-japanese latexmk fonts-noto-cjk fonts-ipafont
+            texlive-lang-japanese texlive-fonts-extra texlive-luatex \
+            latexmk fonts-noto-cjk fonts-ipafont fonts-liberation
 
       - name: Build guide.pdf (Makefile を使用、XeLaTeX で日本語対応)
         working-directory: latex
