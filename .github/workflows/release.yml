@@ -161,18 +161,20 @@ jobs:
 
       - name: Create GitHub Release with assets
         id: create_release
+        continue-on-error: true
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ github.ref_name || format('release-{0}', github.run_number) }}
-          name: ${{ github.ref_name || format('Release {0}', github.run_number) }}
+          tag_name: build-${{ github.run_id }}-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          draft: false
+          prerelease: false
           body: |
             ## 自動生成リリース
             
             このリリースには以下が含まれています:
             - `guide.pdf` - LaTeX でビルドされたドキュメント
-            - `starter-kit-*.zip` - starter-kit アーカイブ（.gitignore を参照して除外）
+            - `starter-kit.zip` - starter-kit アーカイブ
             
-            生成日時: ${{ github.event.head_commit.timestamp }}
             ワークフロー実行: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           files: |
             release_files/*
@@ -180,13 +182,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release summary
-        if: success()
+        if: always()
         run: |
-          echo "✓ Release created successfully!"
+          echo "=== Release Summary ==="
           echo ""
-          echo "Release Info:"
-          echo "  Tag: ${{ github.ref_name || format('release-{0}', github.run_number) }}"
-          echo "  URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name || format('release-{0}', github.run_number) }}"
-          echo ""
-          echo "Assets:"
-          ls -lh release_files/ || echo "No files in release_files"
+          if [ -d release_files ]; then
+            echo "Release files:"
+            ls -lh release_files/
+          else
+            echo "No release_files directory"
+          fi
+          
+          if [ -f release_files/guide.pdf ]; then
+            echo "✓ PDF found"
+          else
+            echo "✗ PDF NOT found"
+          fi
+          
+          if ls release_files/starter-kit*.zip 1>/dev/null 2>&1; then
+            echo "✓ ZIP found"
+          else
+            echo "⚠ ZIP not found"
+          fi
