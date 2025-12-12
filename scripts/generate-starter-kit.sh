@@ -61,7 +61,8 @@ log_debug() {
 # ===================================
 # エラーハンドラー
 # ===================================
-trap 'on_error $?' EXIT
+# EXIT トラップを削除（明示的なエラーチェックのみ使用）
+# trap 'on_error $?' EXIT を削除し、必要な場所でのみエラーハンドル
 
 on_error() {
     local error_code=$1
@@ -342,14 +343,17 @@ main() {
     echo "========================================"
     echo -e "${NC}"
     
-    check_prerequisites
-    prepare_output_dir
-    validate_files
-    create_zip
-    verify_zip
-    generate_checksum
+    check_prerequisites || return 1
+    prepare_output_dir || return 1
+    validate_files || return 1
+    create_zip || return 1
+    verify_zip || return 1
+    generate_checksum || return 1
     print_summary
+    
+    return 0
 }
 
-# メイン実行
+# メイン実行（エラーコードを正確に返す）
 main "$@"
+exit $?
