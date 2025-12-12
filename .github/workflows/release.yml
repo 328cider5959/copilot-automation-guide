@@ -34,25 +34,25 @@ jobs:
             ~/.texlive*
           key: ${{ runner.os }}-tex-${{ hashFiles('latex/**', 'templates/**') }}
 
-      - name: Install TeX Live (必要なパッケージのみ)
+      - name: Install TeX Live with XeLaTeX and Japanese fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended \
-            texlive-lang-japanese latexmk
+            texlive-xetex texlive-latex-extra texlive-fonts-recommended \
+            texlive-lang-japanese latexmk fonts-noto-cjk fonts-ipafont
 
-      - name: Build guide.pdf (Makefile を使用)
+      - name: Build guide.pdf (Makefile を使用、XeLaTeX で日本語対応)
         working-directory: latex
         run: |
-          # Makefile が存在する場合は make を使用、なければ直接 pdflatex を実行
+          # Makefile が存在する場合は make を使用、なければ直接 xelatex を実行
           if [ -f Makefile ]; then
             echo "Makefile found. Using make pdf..."
             make pdf
           else
-            echo "Makefile not found. Using direct pdflatex..."
+            echo "Makefile not found. Using direct xelatex..."
             set -e
-            pdflatex -interaction=nonstopmode guide.tex
-            pdflatex -interaction=nonstopmode guide.tex
+            xelatex -interaction=nonstopmode guide.tex
+            xelatex -interaction=nonstopmode guide.tex
           fi
 
       - name: Verify PDF output

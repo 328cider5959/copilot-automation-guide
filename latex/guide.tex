@@ -1,36 +1,44 @@
 %!TEX encoding = UTF-8 Unicode
 % -*- coding: utf-8 -*-
 % Copilot 完全自動化ガイド 最終版
-% LaTeX Ultimate PDF Version
+% LaTeX XeLaTeX 対応版（日本語フォント完全サポート）
 
-\documentclass[11pt,a4paper,dvipdfmx,uplatex]{jreport}
+\documentclass[11pt,a4paper]{report}
 
 % ========================================
 % パッケージ読み込み
 % ========================================
 
-% 日本語フォント設定
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{lmodern}
+% UTF-8 エンコーディング対応（XeLaTeX）
+\usepackage[UTF-8]{fontspec}
 
-% CJK フォント（日本語対応）
-\usepackage[dvipdfmx]{graphicx}
+% 日本語フォント設定（XeLaTeX）
+\usepackage{xeCJK}
+\setCJKmainfont{IPAMincho}      % 日本語メインフォント
+\setCJKsansfont{IPAGothic}      % 日本語サンスセリフ
+\setmainfont{Libertinus Serif}  % 英数字フォント
+\setsansfont{Libertinus Sans}
+
+% 画像対応
+\usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{amsmath,amssymb}
 
 % ハイパーリンク
-\usepackage[dvipdfmx,bookmarks=true,colorlinks=true,
+\usepackage[bookmarks=true,colorlinks=true,
             linkcolor=blue,urlcolor=blue,citecolor=blue]{hyperref}
 
-% コード表示（listings環境）
+% コード表示（listings環境）- UTF-8対応
 \usepackage{listings}
-\usepackage{jlisting}  % 日本語対応listings
-
-% フォント設定
-\usepackage{xltxtra}
-\usepackage{xunicode}
-\defaultfontfeatures{Mapping=tex-text}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  inputencoding=utf8,
+  extendedchars=true,
+  showstringspaces=false,
+  columns=fullflexible,
+  keepspaces=true
+}
 
 % レイアウト
 \usepackage[margin=25mm,headheight=15pt]{geometry}
@@ -46,8 +54,17 @@
 \usepackage{array}
 \usepackage{tabularx}
 
-% 日本語フォント（デフォルト設定）
+% フォント族のデフォルト
 \renewcommand{\familydefault}{\sfdefault}
+
+% ========================================
+% カスタムコマンド定義
+% ========================================
+\newcommand{\cmd}[1]{\texttt{#1}}              % コマンド/ターミナル入力表示
+\newcommand{\file}[1]{\texttt{#1}}             % ファイル/パス表示
+\newcommand{\tip}[1]{\textbf{ヒント:} #1}      % ヒント/注釈表示
+\newcommand{\warning}[1]{\textbf{警告:} #1}   % 警告表示
+\newcommand{\note}[1]{\textit{注: #1}}         % 備考表示
 
 % ========================================
 % Listings 環境設定（コード表示）
@@ -248,14 +265,14 @@ LaTeX CJK Package Documentation.
 \end{thebibliography}
 
 % セクションファイルを読み込む
-\include{sections/overview}
-\include{sections/starter-kit}
-\include{sections/zip-script}
-\include{sections/github-actions}
-\include{sections/dockerfile}
-\include{sections/power-automate}
-\include{sections/security}
-\include{sections/deployment-guide}
-\include{sections/workflow-diagram}
+\include{sections/01-overview}
+\include{sections/02-starter-kit}
+\include{sections/03-zip-script}
+\include{sections/04-github-actions}
+\include{sections/05-dockerfile}
+\include{sections/06-power-automate}
+\include{sections/07-security}
+\include{sections/08-manual}
+\include{sections/09-workflow}
 
 \end{document}
