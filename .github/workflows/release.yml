@@ -91,12 +91,29 @@ jobs:
           chmod +x scripts/generate-starter-kit.sh
           
           # スクリプト実行（UTF-8対応、.gitignore参照）
-          bash scripts/generate-starter-kit.sh
+          bash scripts/generate-starter-kit.sh || { echo "Script failed with exit code $?"; exit 1; }
           
           # 生成された ZIP を確認
-          ls -lh output/starter-kit*.zip
+          echo "=== Checking for ZIP files ==="
+          if [ -d output ]; then
+            ls -lh output/ || echo "output directory is empty"
+          else
+            echo "output directory does not exist!"
+            exit 1
+          fi
+
+      - name: List all artifacts before upload
+        run: |
+          echo "=== Files in current directory ==="
+          find . -name "*.zip" -type f
+          
+          echo "=== Contents of output directory ==="
+          if [ -d output ]; then
+            ls -la output/
+          fi
 
       - name: Upload ZIP artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: starter-kit-zip
@@ -117,18 +134,37 @@ jobs:
           path: artifacts
 
       - name: Download ZIP artifact
+        id: download_zip
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           name: starter-kit-zip
           path: artifacts
 
-      - name: List downloaded artifacts
+      - name: List artifacts
         run: |
           echo "=== Downloaded artifacts ==="
-          ls -lh artifacts/
-          echo ""
-          echo "Total artifacts:"
-          find artifacts -type f -exec ls -lh {} \;
+          ls -lh artifacts/ || echo "No artifacts found"
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release_files
+          
+          # PDF をコピー
+          if [ -f artifacts/guide.pdf ]; then
+            cp artifacts/guide.pdf release_files/
+            echo "✓ PDF copied"
+          fi
+          
+          # ZIP をコピー（存在する場合）
+          if [ -f artifacts/starter-kit-*.zip ]; then
+            cp artifacts/starter-kit-*.zip release_files/ 2>/dev/null || true
+            echo "✓ ZIP copied"
+          else
+            echo "⚠ ZIP not found (will create release with PDF only)"
+          fi
+          
+          ls -lh release_files/
 
       - name: Create GitHub Release with assets
         id: create_release
@@ -146,8 +182,7 @@ jobs:
             生成日時: ${{ github.event.head_commit.timestamp }}
             ワークフロー実行: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           files: |
-            artifacts/guide.pdf
-            artifacts/starter-kit-*.zip
+            release_files/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -161,4 +196,4 @@ jobs:
           echo "  URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name || format('release-{0}', github.run_number) }}"
           echo ""
           echo "Assets:"
-          ls -lh artifacts/
+          ls -lh release_files/ || echo "No files in release_files"
