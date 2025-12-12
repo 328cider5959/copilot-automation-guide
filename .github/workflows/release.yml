@@ -161,23 +161,27 @@ jobs:
 
       - name: Create GitHub Release with assets
         id: create_release
-        continue-on-error: true
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: build-${{ github.run_id }}-${{ github.run_number }}
-          name: Build ${{ github.run_number }}
-          draft: false
-          prerelease: false
-          body: |
-            ## 自動生成リリース
-            
-            このリリースには以下が含まれています:
-            - `guide.pdf` - LaTeX でビルドされたドキュメント
-            - `starter-kit.zip` - starter-kit アーカイブ
-            
-            ワークフロー実行: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          files: |
-            release_files/*
+        run: |
+          # ファイル確認
+          echo "=== Checking files before release ==="
+          if [ ! -f release_files/guide.pdf ]; then
+            echo "Error: guide.pdf not found"
+            exit 1
+          fi
+          
+          # Release 作成（gh CLI を使用）
+          TAG="build-${{ github.run_id }}"
+          
+          echo "Creating release with tag: $TAG"
+          
+          # Release を作成
+          gh release create "$TAG" \
+            --title "Build ${{ github.run_number }}" \
+            --notes "Auto-generated release with guide.pdf and starter-kit.zip" \
+            release_files/* \
+            || echo "Release creation failed or already exists"
+          
+          echo "Release creation completed"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
