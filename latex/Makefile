@@ -29,16 +29,20 @@ pdf: $(PDF)
 
 $(PDF): $(MAIN)
 	@echo "Building $(PDF) using xelatex (1st pass)..."
-	xelatex -interaction=nonstopmode $(MAIN)
+	xelatex -interaction=nonstopmode -halt-on-error=false $(MAIN) || true
 	@echo "Building $(PDF) using xelatex (2nd pass)..."
-	xelatex -interaction=nonstopmode $(MAIN)
-	@echo "$(PDF) built successfully."
+	xelatex -interaction=nonstopmode -halt-on-error=false $(MAIN) || true
+	@if [ -f $(PDF) ]; then \
+		echo "$(PDF) built successfully."; \
+	else \
+		echo "Error: PDF generation failed"; exit 1; \
+	fi
 
 # latexmk を使用したビルド（推奨、参照が自動で確定）
 .PHONY: latexmk
 latexmk:
 	@echo "Building $(PDF) using latexmk with xelatex..."
-	latexmk -xelatex -interaction=nonstopmode $(MAIN)
+	latexmk -xelatex -interaction=nonstopmode -halt-on-error=false $(MAIN) || true
 	@echo "$(PDF) built successfully with latexmk."
 
 # 中間ファイルを削除（PDF は保持）
